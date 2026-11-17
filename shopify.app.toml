@@ -1,0 +1,37 @@
+# Shopify app configuration. `client_id` is filled in by `npm run config:link`.
+client_id = ""
+name = "Personalizer"
+application_url = "https://example.com"
+embedded = true
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+# Add write_cart_transforms only if Part 07 option B is built.
+scopes = "read_products,write_products,read_orders,write_files,read_themes"
+
+[auth]
+redirect_urls = ["https://example.com/auth/callback"]
+
+[app_proxy]
+url = "https://example.com/proxy"
+prefix = "apps"
+subpath = "personalizer"
+
+[webhooks]
+api_version = "2026-10"
+
+  # Handled by: /app/routes/webhooks.app.uninstalled.tsx
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/app/uninstalled"
+  topics = ["app/uninstalled"]
+
+  # Handled by: /app/routes/webhooks.app.scopes_update.tsx
+  [[webhooks.subscriptions]]
+  topics = ["app/scopes_update"]
+  uri = "/webhooks/app/scopes_update"
+
+  # orders/*, refunds/create, products/* -> added in T19 (Part 08)
+  # compliance_topics (customers/data_request, customers/redact, shop/redact) -> added in T37
+
+[build]
+include_config_on_deploy = true

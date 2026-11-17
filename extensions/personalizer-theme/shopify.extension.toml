@@ -1,0 +1,6 @@
+api_version = "2026-10"
+
+[[extensions]]
+name = "Personalizer theme"
+handle = "personalizer-theme"
+type = "theme"

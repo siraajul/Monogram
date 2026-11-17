@@ -1,0 +1,20 @@
+{%- comment -%}
+  App block: placed on the product page by the merchant. Part 05 fills this in.
+  The widget bundle is loaded by the "Personalizer core" app embed.
+{%- endcomment -%}
+<div
+  class="pz-block"
+  data-personalizer-root
+  data-product-id="{{ product.id }}"
+  data-product-handle="{{ product.handle }}"
+  data-shop="{{ shop.permanent_domain }}"
+></div>
+
+{% schema %}
+{
+  "name": "Personalizer",
+  "target": "section",
+  "templates": ["product"],
+  "settings": []
+}
+{% endschema %}

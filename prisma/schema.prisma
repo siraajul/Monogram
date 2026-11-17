@@ -1,0 +1,211 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
+// enough when changing adapters.
+// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Session {
+  id                  String    @id
+  shop                String
+  state               String
+  isOnline            Boolean   @default(false)
+  scope               String?
+  expires             DateTime?
+  accessToken         String
+  userId              BigInt?
+  firstName           String?
+  lastName            String?
+  email               String?
+  accountOwner        Boolean   @default(false)
+  locale              String?
+  collaborator        Boolean?  @default(false)
+  emailVerified       Boolean?  @default(false)
+  refreshToken        String?
+  refreshTokenExpires DateTime?
+}
+
+model Shop {
+  id            String         @id @default(cuid())
+  domain        String         @unique // xxx.myshopify.com
+  plan          String         @default("free") // our plan key, see Part 10
+  currency      String         @default("USD")
+  settings      Json           @default("{}") // ShopSettings (Part 03)
+  feeProductId  String? // gid of hidden add-on product (Part 07)
+  installedAt   DateTime       @default(now())
+  uninstalledAt DateTime?
+  optionSets    OptionSet[]
+  fonts         Font[]
+  libraries     AssetLibrary[]
+  templates     Template[]
+}
+
+enum SetStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model OptionSet {
+  id          String             @id @default(cuid())
+  shopId      String
+  shop        Shop               @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  name        String
+  status      SetStatus          @default(DRAFT)
+  version     Int                @default(1) // bumps on every publish
+  assignment  Json               @default("{}") // Assignment (Part 03)
+  templateId  String? // Designer edition
+  draft       Json // full OptionSetDraft (Part 03) — single source while editing
+  publishedAt DateTime?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  versions    OptionSetVersion[]
+
+  @@index([shopId, status])
+}
+
+// Immutable snapshot per publish. Designs reference a version, so editing never breaks old orders.
+model OptionSetVersion {
+  id          String    @id @default(cuid())
+  optionSetId String
+  optionSet   OptionSet @relation(fields: [optionSetId], references: [id], onDelete: Cascade)
+  version     Int
+  config      Json // ProductConfig minus product-specific fields
+  createdAt   DateTime  @default(now())
+
+  @@unique([optionSetId, version])
+}
+
+model ProductAssignment {
+  id          String @id @default(cuid())
+  shopId      String
+  productGid  String
+  optionSetId String
+  version     Int
+
+  @@unique([shopId, productGid])
+  @@index([optionSetId])
+}
+
+model Font {
+  id          String   @id @default(cuid())
+  shopId      String
+  shop        Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  family      String
+  weight      Int      @default(400)
+  style       String   @default("normal")
+  woff2Url    String // storefront
+  sourceUrl   String // TTF/OTF for the renderer
+  licenseNote String?
+  createdAt   DateTime @default(now())
+}
+
+enum LibraryType {
+  CLIPART
+  PALETTE
+}
+
+model AssetLibrary {
+  id     String      @id @default(cuid())
+  shopId String
+  shop   Shop        @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  name   String
+  type   LibraryType
+  assets Asset[]
+}
+
+model Asset {
+  id        String       @id @default(cuid())
+  libraryId String
+  library   AssetLibrary @relation(fields: [libraryId], references: [id], onDelete: Cascade)
+  name      String
+  url       String? // clipart image (SVG/PNG)
+  hex       String? // palette colour
+  tags      String[]
+  position  Int          @default(0)
+}
+
+// Designer edition (v2)
+model Template {
+  id        String   @id @default(cuid())
+  shopId    String
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  name      String
+  data      Json // TemplateData (Part 03): views, printAreas, layers
+  updatedAt DateTime @updatedAt
+}
+
+model Upload {
+  id             String   @id @default(cuid())
+  shopId         String
+  key            String   @unique // storage key
+  mime           String
+  bytes          Int
+  width          Int?
+  height         Int?
+  usedByDesignId String?
+  expiresAt      DateTime // now + 30 days unless used by an order
+  createdAt      DateTime @default(now())
+
+  @@index([expiresAt])
+}
+
+model Design {
+  id               String   @id @default(cuid())
+  shopId           String
+  productGid       String
+  variantGid       String
+  optionSetId      String
+  optionSetVersion Int
+  answers          Json // Answers (Part 03)
+  canvas           Json? // Designer edition state
+  previewKey       String? // storage key of preview PNG/WebP
+  accessToken      String // random, stored on cart line as _design_token
+  createdAt        DateTime @default(now())
+
+  @@index([shopId, createdAt])
+}
+
+enum JobStatus {
+  QUEUED
+  RUNNING
+  DONE
+  FAILED
+  CANCELLED
+}
+
+model OrderLine {
+  id          String    @id @default(cuid())
+  shopId      String
+  orderGid    String
+  orderName   String // "#1001"
+  lineItemGid String    @unique
+  designId    String?
+  quantity    Int
+  status      JobStatus @default(QUEUED)
+  outputs     Json      @default("[]") // RenderOutput[] (Part 08)
+  error       String?
+  attempts    Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([shopId, createdAt])
+}
+
+model UsageRecord {
+  id             String    @id @default(cuid())
+  shopId         String
+  orderLineId    String    @unique
+  amountCents    Int
+  shopifyUsageId String?
+  createdAt      DateTime  @default(now())
+  reversedAt     DateTime?
+}

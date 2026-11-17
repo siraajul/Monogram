@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgres://personalizer:personalizer@localhost:5432/personalizer
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: personalizer
+          POSTGRES_PASSWORD: personalizer
+          POSTGRES_DB: personalizer
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U personalizer"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate && npx prisma validate
+      - run: npx prisma migrate deploy
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run coverage   # contract functions must stay at 100%
+      - run: npm test
+      - run: npm run build:widget
+      - run: npm run check:bundle-size
+      - run: npm run build
+      - run: npm run build:worker
+
+  e2e-smoke:
+    # Main branch only. Needs repo secrets for a dev store; skipped until they exist.
+    if: github.ref == 'refs/heads/main' && vars.E2E_ENABLED == 'true'
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "Playwright smoke test against the dev store is added in T23 (Part 11)."
